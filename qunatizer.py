@@ -1,14 +1,15 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from sklearn.cluster import KMeans
 
 
 class VectorQuantizer(nn.Module):
-    def __init__(self, vector_num, vector_dim, beta):
+    def __init__(self, vector_num, vector_dim, commitment_weight):
         super().__init__()
         self.vector_dim = vector_dim
         self.vector_num = vector_num
-        self.beta = beta
+        self.commitment_weight = commitment_weight
         
         self.vectors = nn.Embedding(vector_num, vector_dim)
         self.vectors.weight.data.uniform_(-1/vector_num, 1/vector_num) # to K-means
@@ -33,15 +34,18 @@ class VectorQuantizer(nn.Module):
         ## Compute the quant loss
         e_latent_loss = F.mse_loss(quantized.detach(), x)
         q_latent_loss = F.mse_loss(quantized, x.detach())
-        quant_loss = q_latent_loss + self.beta * e_latent_loss
+        quant_loss = q_latent_loss + self.commitment_weight * e_latent_loss
         
         ## Get the quantized outputs
         quantized = x + (quantized - x).detach()
         
         ## Compute the diverse loss
+        # encodings (one-hot): batch, vector_num
+        # counts (whose sum = batch): vector_num
         counts = torch.sum(encodings, dim=0)
-        N = x.shape[0]
-        util_loss = torch.sum(torch.abs(counts - N/self.vector_num))/N
+        batch_size = x.shape[0]
+        
+        util_loss = torch.mean(torch.abs(counts - batch_size/self.vector_num))
         compact_loss = 2*torch.mean(torch.pdist(self.vectors.weight, p=2))
         # div_loss = util_loss + compact_loss
         
@@ -54,11 +58,11 @@ class VectorQuantizer(nn.Module):
     
     
 class ResidualVectorQuantizer(nn.Module):
-    def __init__(self, codebook_num, vector_num, vector_dim, beta):
+    def __init__(self, codebook_num, vector_num, vector_dim, commitment_weight):
         super().__init__()
         self.codebook_num = codebook_num
         self.quantizers = nn.ModuleList([
-            VectorQuantizer(vector_num, vector_dim, beta) 
+            VectorQuantizer(vector_num, vector_dim, commitment_weight) 
             for _ in range(codebook_num)
         ])
         self.loss_items = ["quantization", "utilization", "compactness"]
@@ -80,4 +84,22 @@ class ResidualVectorQuantizer(nn.Module):
             
         return quantized, total_loss, all_indices
 
+    
+    def initialize(self, x, random_state):  
+        quantized = 0
+        residual = x 
+        device = x.device
+        
+        for layer_idx, quantizer in enumerate(self.quantizers):
+            kmeans = KMeans(n_clusters=quantizer.vector_num, random_state=random_state, n_init=10)
+            kmeans.fit(residual.detach().cpu().numpy())
+        
+            self.quantizers[layer_idx].weight = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32).to(device)
+            cur_quantized, _, _ = quantizer(residual)
+            
+            quantized += cur_quantized
+            residual = x - quantized
+            
+        print("Initialized quantizer using k-means!")
+        
 

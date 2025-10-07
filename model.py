@@ -9,19 +9,21 @@ import qunatizer
 class RQVAE(nn.Module):
     def __init__(self, 
                 embedding_dim, 
-                vae_hidden_dims=[128, 512, 1024],
-                vector_dim=64, 
-                vector_num=64, 
-                codebook_num=3, 
-                beta=0.5, 
+                vae_hidden_dims,
+                vector_dim, 
+                vector_num, 
+                codebook_num, 
+                commitment_weight,
+                random_state 
                 ):
         super().__init__()
         
         self.encoder = encoder.Encoder(embedding_dim, vae_hidden_dims, vector_dim)
         self.decoder = decoder.Decoder(vector_dim, vae_hidden_dims, embedding_dim)
-        self.quantizer = qunatizer.ResidualVectorQuantizer(codebook_num, vector_num, vector_dim, beta)
+        self.quantizer = qunatizer.ResidualVectorQuantizer(codebook_num, vector_num, vector_dim, commitment_weight)
         self._initialize_weights()
         self.recon_criterion = nn.MSELoss()
+        self.random_state = random_state
     
     
     def _initialize_weights(self):
@@ -42,6 +44,8 @@ class RQVAE(nn.Module):
         
         return quantized, cur_loss, all_indices
 
-
-
+    
+    def initialize(self, x):
+        features = self.encoder(x)
+        self.quantizer.initialize(features, self.random_state)
     

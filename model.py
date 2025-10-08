@@ -18,6 +18,8 @@ class RQVAE(nn.Module):
                 ):
         super().__init__()
         
+        ## Encoder will rearrange the hidden dims decreasingly (downsampling)
+        ## while Decoder will rearrange them increasingly (upsampling)
         self.encoder = encoder.Encoder(embedding_dim, vae_hidden_dims, vector_dim)
         self.decoder = decoder.Decoder(vector_dim, vae_hidden_dims, embedding_dim)
         self.quantizer = quantizer.ResidualVectorQuantizer(codebook_num, vector_num, vector_dim, commitment_weight)

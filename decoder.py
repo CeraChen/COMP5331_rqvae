@@ -5,7 +5,8 @@ import torch.nn.functional as F
 class Decoder(nn.Module):
     def __init__(self, input_dim, hidden_dims, output_dim):
         super().__init__()
-        layers = []
+        layers = []        
+        hidden_dims = sorted(hidden_dims, reverse=False)
         prev_dim = input_dim
         
         for hidden_dim in hidden_dims:

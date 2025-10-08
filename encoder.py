@@ -6,6 +6,7 @@ class Encoder(nn.Module):
     def __init__(self, input_dim, hidden_dims, output_dim):
         super().__init__()
         layers = []
+        hidden_dims = sorted(hidden_dims, reverse=True)
         prev_dim = input_dim
         
         for hidden_dim in hidden_dims:

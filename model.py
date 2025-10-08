@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import encoder
 import decoder
-import qunatizer
+import quantizer
 
 
 class RQVAE(nn.Module):
@@ -20,7 +20,7 @@ class RQVAE(nn.Module):
         
         self.encoder = encoder.Encoder(embedding_dim, vae_hidden_dims, vector_dim)
         self.decoder = decoder.Decoder(vector_dim, vae_hidden_dims, embedding_dim)
-        self.quantizer = qunatizer.ResidualVectorQuantizer(codebook_num, vector_num, vector_dim, commitment_weight)
+        self.quantizer = quantizer.ResidualVectorQuantizer(codebook_num, vector_num, vector_dim, commitment_weight)
         self._initialize_weights()
         self.recon_criterion = nn.MSELoss()
         self.random_state = random_state
